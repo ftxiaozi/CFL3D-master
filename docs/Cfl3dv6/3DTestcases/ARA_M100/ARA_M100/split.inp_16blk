@@ -1,0 +1,40 @@
+NPUT (UNSPLIT) FILES
+cfl3d.inp_1blk
+null
+m100sbj57k49twfix.gridp3d_fmt
+null
+ICFLVER   IRONVER   IGRDFMT    ISDFMT
+      5         1         0         1
+OUTPUT (SPLIT) FILES
+cfl3d.inp_16blk
+null
+m100sbj57k49twfix.gridp3d_16blk_unf
+null
+ICFLVER   IRONVER   IGRDFMT    ISDFMT
+      5         1         1         1
+NSPLITS
+8
+1
+3
+0
+1
+1
+281
+1
+1
+241
+1
+1
+201
+1
+1
+161
+1
+1
+121
+1
+1
+81
+1
+1
+41
