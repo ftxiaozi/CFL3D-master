@@ -134,6 +134,7 @@ c
 c
 c      gradient limiting - cell interface interpolations
 c
+      if (real(xkap).lt.+2.e0 .or. jdim1.lt.3) then
 cdir$ ivdep
       do 700 izz=1,nr
       t(izz,2) = t(izz+1,1)
@@ -156,6 +157,31 @@ cdir$ ivdep
       t(izz+1,20+l) = q(izz,1,i,l)+t(izz,2)
       t(izz  ,25+l) = q(izz,1,i,l)-t(izz,1)
   800 continue
+      else
+c
+c     fifth-order WENO interface reconstruction
+c
+      nr2 = n-2
+      nr3 = n-3
+cdir$ ivdep
+      do 720 izz=1,nr
+      t(izz,2) = t(izz+1,1)
+  720 continue
+cdir$ ivdep
+      do 730 izz=1,nr2
+      t(izz,3) = t(izz+2,1)
+  730 continue
+cdir$ ivdep
+      do 740 izz=1,nr3
+      t(izz,4) = t(izz+3,1)
+  740 continue
+      call xlim2(nr3,t(1,1),t(1,2),t(1,3),t(1,4))
+cdir$ ivdep
+      do 810 izz=1,nr3
+      t(izz+2,20+l) = q(izz+1,1,i,l)+t(izz,2)
+      t(izz+1,25+l) = q(izz+1,1,i,l)-t(izz,1)
+  810 continue
+      end if
  1000 continue
       end if
 c
@@ -168,9 +194,16 @@ c
       kl = 0
       do 1100 kk=1,kdim1
       kl = kl + 1
-      t(kl,1) = qj0(kk,ii,l,1) - qj0(kk,ii,l,2)
-      t(kl,2) = q(1,kk,ii,l)   - qj0(kk,ii,l,1)
-      t(kl,3) = qj0(kk,ii,l,1)
+      if (real(xkap).lt.+2.e0 .or. jdim1.lt.3) then
+         t(kl,1) = qj0(kk,ii,l,1) - qj0(kk,ii,l,2)
+         t(kl,2) = q(1,kk,ii,l)   - qj0(kk,ii,l,1)
+         t(kl,3) = qj0(kk,ii,l,1)
+      else
+         t(kl,1) = qj0(kk,ii,l,1) - qj0(kk,ii,l,2)
+         t(kl,2) = q(1,kk,ii,l)   - qj0(kk,ii,l,1)
+         t(kl,3) = q(2,kk,ii,l)   - q(1,kk,ii,l)
+         t(kl,4) = q(3,kk,ii,l)   - q(2,kk,ii,l)
+      end if
  1100 continue
       ifl = iflim(2)
       if (ifl.eq.4) then
@@ -182,16 +215,29 @@ c
       else
         ncells = jdim1
       end if
-      call xlim(xkap,kdim1,t(1,1),t(1,2),t(1,3),ifl,ncells,l)
+      if (real(xkap).lt.+2.e0 .or. jdim1.lt.3) then
+         call xlim(xkap,kdim1,t(1,1),t(1,2),t(1,3),ifl,ncells,l)
+      else
+         call xlim2(kdim1,t(1,1),t(1,2),t(1,3),t(1,4))
+      end if
       jc = (ipl-1)*(kdim*jdim) + 1 - jdim
       kl = 0
       do 1200 kk=1,kdim1
       kl = kl + 1
       jc = jc + jdim
-      t(jc,20+l) = (1.0-bcj(kk,ii,1))*(qj0(kk,ii,l,1)+t(kl,2))
-     .                 +bcj(kk,ii,1) * qj0(kk,ii,l,1)
-      t(jc,25+l) = (1.0-bcj(kk,ii,1))* t(jc,25+l)
-     .                 +bcj(kk,ii,1) * qj0(kk,ii,l,1)
+      if (real(xkap).lt.+2.e0 .or. jdim1.lt.3) then
+         t(jc,20+l) = (1.0-bcj(kk,ii,1))*
+     .                (qj0(kk,ii,l,1)+t(kl,2))
+     .                   +bcj(kk,ii,1) * qj0(kk,ii,l,1)
+         t(jc,25+l) = (1.0-bcj(kk,ii,1))* t(jc,25+l)
+     .                   +bcj(kk,ii,1) * qj0(kk,ii,l,1)
+      else
+         t(jc+1,20+l) = q(1,kk,ii,l)+t(kl,2)
+         t(jc,25+l)   = (1.0-bcj(kk,ii,1))*
+     .                  (q(1,kk,ii,l)-t(kl,1))
+     .                  +bcj(kk,ii,1) * qj0(kk,ii,l,1)
+         t(jc,20+l)   = qj0(kk,ii,l,1)
+      end if
  1200 continue
  1300 continue
 c
@@ -202,9 +248,16 @@ c
       kl = 0
       do 1600 kk=1,kdim1
       kl = kl + 1
-      t(kl,2) = qj0(kk,ii,l,4) - qj0(kk,ii,l,3)
-      t(kl,1) = qj0(kk,ii,l,3) - q(jdim1,kk,ii,l)
-      t(kl,3) = qj0(kk,ii,l,3)
+      if (real(xkap).lt.+2.e0 .or. jdim1.lt.3) then
+         t(kl,2) = qj0(kk,ii,l,4) - qj0(kk,ii,l,3)
+         t(kl,1) = qj0(kk,ii,l,3) - q(jdim1,kk,ii,l)
+         t(kl,3) = qj0(kk,ii,l,3)
+      else
+         t(kl,1) = q(jdim1-1,kk,ii,l)-q(jdim1-2,kk,ii,l)
+         t(kl,2) = q(jdim1,kk,ii,l)-q(jdim1-1,kk,ii,l)
+         t(kl,3) = qj0(kk,ii,l,3)-q(jdim1,kk,ii,l)
+         t(kl,4) = qj0(kk,ii,l,4)-qj0(kk,ii,l,3)
+      end if
  1600 continue
       ifl = iflim(2)
       if (ifl.eq.4) then
@@ -216,16 +269,29 @@ c
       else
         ncells = jdim1
       end if
-      call xlim(xkap,kdim1,t(1,1),t(1,2),t(1,3),ifl,ncells,l)
+      if (real(xkap).lt.+2.e0 .or. jdim1.lt.3) then
+         call xlim(xkap,kdim1,t(1,1),t(1,2),t(1,3),ifl,ncells,l)
+      else
+         call xlim2(kdim1,t(1,1),t(1,2),t(1,3),t(1,4))
+      end if
       jc = (ipl-1)*(kdim*jdim)
       kl = 0
       do 1700 kk=1,kdim1
       kl = kl + 1
       jc = jc + jdim
-      t(jc,20+l) = (1.0-bcj(kk,ii,2))* t(jc,20+l)
-     .                 +bcj(kk,ii,2) * qj0(kk,ii,l,3)
-      t(jc,25+l) = (1.0-bcj(kk,ii,2))*(qj0(kk,ii,l,3)-t(kl,1))
-     .                 +bcj(kk,ii,2) * qj0(kk,ii,l,3)
+      if (real(xkap).lt.+2.e0 .or. jdim1.lt.3) then
+         t(jc,20+l) = (1.0-bcj(kk,ii,2))* t(jc,20+l)
+     .                   +bcj(kk,ii,2) * qj0(kk,ii,l,3)
+         t(jc,25+l) = (1.0-bcj(kk,ii,2))*
+     .                (qj0(kk,ii,l,3)-t(kl,1))
+     .                   +bcj(kk,ii,2) * qj0(kk,ii,l,3)
+      else
+         t(jc-1,25+l) = q(jdim1,kk,ii,l)-t(kl,1)
+         t(jc,20+l)   = (1.0-bcj(kk,ii,2))*
+     .                  (q(jdim1,kk,ii,l)+t(kl,2))
+     .                  +bcj(kk,ii,2) * qj0(kk,ii,l,3)
+         t(jc,25+l)   = qj0(kk,ii,l,3)
+      end if
  1700 continue
  1800 continue
 c

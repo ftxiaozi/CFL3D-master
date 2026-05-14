@@ -185,3 +185,73 @@ c
 c
       return
       end
+c
+      subroutine xlim2(n,x1,x2,x3,x4)
+c
+c***********************************************************************
+c     Purpose:  Perform fifth-order WENO-Z interface reconstruction.
+c
+c     On input:
+c        x1 is del(-2), x2 is del(-1), x3 is del(+1), x4 is del(+2).
+c     On output:
+c        x2 is the correction for right-interface construction,
+c        x1 is the correction for left-interface construction.
+c***********************************************************************
+c
+#   ifdef CMPLX
+      implicit complex(a-h,o-z)
+#   endif
+c
+      dimension x1(n),x2(n),x3(n),x4(n)
+c
+      eps = 1.0e-02
+c
+cdir$ ivdep
+      do 1000 izz=1,n
+      t1 = x1(izz)
+      t2 = x2(izz)
+      t3 = x3(izz)
+      t4 = x4(izz)
+c
+      ql0 =  5.0e0/6.0e0*t2 - 1.0e0/3.0e0*t1
+      ql1 =  1.0e0/3.0e0*t3 + 1.0e0/6.0e0*t2
+      ql2 = -1.0e0/6.0e0*t4 + 2.0e0/3.0e0*t3
+c
+      qr0 =  2.0e0/3.0e0*t2 - 1.0e0/6.0e0*t1
+      qr1 =  1.0e0/6.0e0*t3 + 1.0e0/3.0e0*t2
+      qr2 = -1.0e0/3.0e0*t4 + 5.0e0/6.0e0*t3
+c
+      beta0 = 13.0e0/12.0e0*(t2-t1)**2
+     .      + 0.25e0*(3.0e0*t2-t1)**2
+      beta1 = 13.0e0/12.0e0*(t3-t2)**2
+     .      + 0.25e0*(t3+t2)**2
+      beta2 = 13.0e0/12.0e0*(t4-t3)**2
+     .      + 0.25e0*(t4-3.0e0*t3)**2
+c
+      tau = ccabs(beta0-beta2)
+      b0  = 1.0e0 + tau/(eps+beta0)
+      b1  = 1.0e0 + tau/(eps+beta1)
+      b2  = 1.0e0 + tau/(eps+beta2)
+c
+      a0  = 0.1e0*b0
+      a1  = 0.6e0*b1
+      a2  = 0.3e0*b2
+      asum = a0+a1+a2
+      wl0 = a0/asum
+      wl1 = a1/asum
+      wl2 = a2/asum
+c
+      a0  = 0.3e0*b0
+      a1  = 0.6e0*b1
+      a2  = 0.1e0*b2
+      asum = a0+a1+a2
+      wr0 = a0/asum
+      wr1 = a1/asum
+      wr2 = a2/asum
+c
+      x2(izz) = wl0*ql0 + wl1*ql1 + wl2*ql2
+      x1(izz) = wr0*qr0 + wr1*qr1 + wr2*qr2
+ 1000 continue
+c
+      return
+      end

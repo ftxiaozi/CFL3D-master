@@ -1484,6 +1484,7 @@ c              =   0  Frommes's scheme
 c              =   1  central
 c              = 1/3  upwind-biased third order
 c                     (recommended)
+c              >=  2  fifth-order WENO reconstruction
 c
 c***** repeat above for each grid, 1 through ngrid *****
 c
