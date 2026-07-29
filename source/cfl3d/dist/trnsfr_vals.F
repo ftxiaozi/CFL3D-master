@@ -146,7 +146,8 @@ c
      .                geom_img,surf_img,xrotrate_img,yrotrate_img,
      .                zrotrate_img
       common /cgns/ icgns,iccg,ibase,nzones,nsoluse,irind,jrind,krind
-      common /des/ cdes,ides,cddes
+      common /des/ cdes,ides,cddes,cdesw,cdese,zface,
+     .             izdes,isub,icdes,iddes
       common /cfl/ dt0,dtold
       common /avgdata/ xnumavg,iteravg,xnumavg2,ipertavg,iclcd,isubit_r
       common /precond/ cprec,uref,avn
@@ -544,6 +545,13 @@ c
          work(nlast+124)= sstrc_crc
          work(nlast+125)= isstsf
          work(nlast+126)= cddes
+         work(nlast+183)= izdes
+         work(nlast+184)= isub
+         work(nlast+185)= icdes
+         work(nlast+186)= iddes
+         work(nlast+187)= cdesw
+         work(nlast+188)= cdese
+         work(nlast+189)= zface
          work(nlast+127)= scal_ic
          work(nlast+128)= ifunct
          work(nlast+129)= lowmem_ux
@@ -906,6 +914,13 @@ c
          sstrc_crc = work(nlast+124)
          isstsf = int(work(nlast+125))
          cddes = work(nlast+126)
+         izdes = int(work(nlast+183))
+         isub = int(work(nlast+184))
+         icdes = int(work(nlast+185))
+         iddes = int(work(nlast+186))
+         cdesw = work(nlast+187)
+         cdese = work(nlast+188)
+         zface = work(nlast+189)
          scal_ic = work(nlast+127)
          ifunct = int(work(nlast+128))
          lowmem_ux = int(work(nlast+129))

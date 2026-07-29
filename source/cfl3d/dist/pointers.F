@@ -87,7 +87,8 @@ c
      .        isst2003
       common /curvat/ isarc2d,sarccr3,ieasmcc2d,isstrc,sstrc_crc,
      .        isar,crot,isarc3d
-      common /des/ cdes,ides,cddes
+      common /des/ cdes,ides,cddes,cdesw,cdese,zface,
+     .             izdes,isub,icdes,iddes
       common /plot3dtyp/ ifunct
       common /memry/ lowmem_ux
       common /constit/ i_nonlin,c_nonlin,snonlin_lim,i_tauijs,i_qcr2000,

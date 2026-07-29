@@ -51,6 +51,7 @@ FSRC_LIBS = \
 	blockk.f       dfhat.f        grdmove.f      q8sdot.f \
 	bsub.f         dfluxpm.f      hfluxl.f       q8smax.f \
 	bsubp.f        diagi.f        q8smin.f       spalart.f \
+	deltaDES.f     deltaDES_isub5.f \
 	ccf.f          diagj.f        hole.f         global0.f \
 	tau2x.f        tdq.f          tinvr.f        tmetric.f \
 	trace.f        trans.f        transmc.f      transp.f \

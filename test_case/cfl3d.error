@@ -1,0 +1,10 @@
+ error code:
+  -1
+
+ abnormal termination due to cfl3d error check
+ (error message follows)
+
+ 
+ dump of unit 11 (main output) buffer:
+ 
+NaN detected after residual evaluation, block   1 time step    1

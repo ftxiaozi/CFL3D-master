@@ -53,7 +53,8 @@ c
       character*120 bou(ibufdim,nbuf)
 c
       dimension nou(nbuf)
-      common /des/ cdes,ides,cddes
+      common /des/ cdes,ides,cddes,cdesw,cdese,zface,
+     .             izdes,isub,icdes,iddes
       common /info/ title(20),rkap(3),xmach,alpha,beta,dt,fmax,nit,ntt,
      .        idiag(3),nitfo,iflagts,iflim(3),nres,levelb(5),mgflag,
      .        iconsf,mseq,ncyc1(5),levelt(5),nitfo1(5),ngam,nsm(5),iipv
@@ -143,6 +144,11 @@ c
       dimension vx(0:jdim,0:kdim,idim-1,iccnum)
       dimension xlscale(jdim-1,kdim-1,idim-1),
      +          fdsav(jdim-1,kdim-1,idim-1)
+#ifdef CMPLX
+      complex, allocatable :: vtm_data(:,:,:)
+#else
+      real, allocatable :: vtm_data(:,:,:)
+#endif
 c
 c
 c   Variables:
@@ -2335,7 +2341,20 @@ c    * * * * * * * * * * * *
      .   '' at all.  Check vist3d levels if unsure.'')')
       end if
 c  DES implementation
-      if (ides .eq. 1 .and. (ivmx .eq. 6 .or. ivmx .eq. 7)) then
+      idesuse=max(ides,izdes)
+      if (isub .eq. 5 .and. idesuse .gt. 0 .and.
+     +   (ivmx .eq. 6 .or. ivmx .eq. 7)) then
+        allocate(vtm_data(jdim-1,kdim-1,idim-1))
+        do i=1,idim-1
+          do k=1,kdim-1
+            do j=1,jdim-1
+              call des_vtm_cell(ux,j,k,i,jdim,kdim,idim,
+     +          vtm_data(j,k,i))
+            enddo
+          enddo
+        enddo
+      endif
+      if (idesuse .eq. 1 .and. (ivmx .eq. 6 .or. ivmx .eq. 7)) then
 c       DES (based on AIAA 2001-0879, but uses only 1 CDES constant)
         do i=1,idim-1
           do j=1,jdim-1
@@ -2350,12 +2369,87 @@ c
               if( i2d .ne. 1 .and. iaxi2planeturb .ne. 1 ) then
                  delta = ccmax(delta,deltai)
               end if
+              if (isub .ge. 1 .and. isub .le. 4)
+     +          call deltaDES(isub,idesuse,j,k,i,jdim,kdim,idim,
+     +          x,y,z,sj,sk,si,vol,ux,1.,delta)
+              if (isub .eq. 5)
+     +          call deltaDES_isub5(idesuse,j,k,i,jdim,kdim,idim,
+     +          x,y,z,sj,sk,si,vol,ux,1.,vtm_data,delta)
               ell=sqrt(turre(j,k,i,2))/(cmuc1*turre(j,k,i,1)*re)
               xlscale(j,k,i) = ccmin(ell,cdes*delta)
             enddo
           enddo
         enddo
-      elseif (ides .ge. 2 .and. (ivmx .eq. 6 .or. ivmx .eq. 7)) then
+      elseif ((idesuse .eq. 4 .or. idesuse .eq. 5) .and.
+     +        (ivmx .eq. 6 .or. ivmx .eq. 7)) then
+c       IDDES-SST (ides=4) and simplified IDDES-SST (ides=5)
+        do i=1,idim-1
+          do j=1,jdim-1
+            do k=1,kdim-1
+              deltaj=2.*vol(j,k,i)/(sj(j,k,i,4)+sj(j+1,k,i,4))
+              deltak=2.*vol(j,k,i)/(sk(j,k,i,4)+sk(j,k+1,i,4))
+              deltai=2.*vol(j,k,i)/(si(j,k,i,4)+si(j,k,i+1,4))
+              deltamax=ccmax(deltaj,ccmax(deltak,deltai))
+              deltamin=ccmin(deltaj,ccmin(deltak,deltai))
+              ell=sqrt(turre(j,k,i,2))/(cmuc1*turre(j,k,i,1)*re)
+              dist=ccabs(smin(j,k,i))
+              velterm=ux(j,k,i,1)**2+ux(j,k,i,2)**2+
+     +          ux(j,k,i,3)**2+ux(j,k,i,4)**2+ux(j,k,i,5)**2+
+     +          ux(j,k,i,6)**2+ux(j,k,i,7)**2+ux(j,k,i,8)**2+
+     +          ux(j,k,i,9)**2+1.e-30
+              rdt=vist3d(j,k,i)/(q(j,k,i,1)*sqrt(velterm)*
+     +            vk**2*dist**2*re+1.e-30)
+              cdl=8.
+              if (iddes .eq. 1) cdl=20.
+              fdt=1.-cctanh((cdl*rdt)**3)
+              alphan=.25-dist/deltamax
+              ttn=alphan**2
+              fb=ccminrc(2.*exp(-9.*ttn),1.)
+              fdn=ccmax(1.-fdt,fb)
+              delta=deltamax
+              if (isub .ge. 1 .and. isub .le. 4)
+     +          call deltaDES(isub,idesuse,j,k,i,jdim,kdim,idim,
+     +          x,y,z,sj,sk,si,vol,ux,fdn,delta)
+              if (isub .eq. 5)
+     +          call deltaDES_isub5(idesuse,j,k,i,jdim,kdim,idim,
+     +          x,y,z,sj,sk,si,vol,ux,fdn,vtm_data,delta)
+              if (real(alphan) .ge. 0.) then
+                fe1=2.*exp(-11.09*ttn)
+              else
+                fe1=2.*exp(-9.*ttn)
+              endif
+              rdl=fnu(j,k,i)/(q(j,k,i,1)*sqrt(velterm)*vk**2*
+     +            dist**2*re+1.e-30)
+              ctt=1.63
+              cll=3.55
+              if (iddes .eq. 1) then
+                ctt=1.87
+                cll=5.
+              endif
+              ftn=cctanh((ctt**2*rdt)**3)
+              fln=cctanh((cll**2*rdl)**10)
+              fe2=1.-ccmax(ftn,fln)
+              fe=fe2*ccmaxrc(0.,fe1-1.)
+              if (idesuse .eq. 5) fe=0.
+              if (iddes .eq. 1) then
+                deltan=.15*ccmax(dist,delta)
+                deltan=ccmin(deltan,delta)
+              else
+                deltan=.15*ccmax(dist,deltamax)
+                deltan=ccmax(deltan,deltamin)
+                deltan=ccmin(deltan,delta)
+              endif
+              cdesn=cdes
+              if (icdes .eq. 1) cdesn=cdesw*blend(j,k,i)+
+     +          cdese*(1.-blend(j,k,i))
+              xlscale(j,k,i)=fdn*(1.+fe)*ell+
+     +          (1.-fdn)*cdesn*deltan
+            enddo
+          enddo
+        enddo
+      elseif ((idesuse .eq. 2 .or. idesuse .eq. 3 .or.
+     +         idesuse .ge. 6) .and.
+     +        (ivmx .eq. 6 .or. ivmx .eq. 7)) then
 c       DDES (based on TCFD 20:181-195, 2006)
         do i=1,idim-1
           do j=1,jdim-1
@@ -2378,15 +2472,22 @@ c
               rd = (vist3d(j,k,i)+fnu(j,k,i))/(q(j,k,i,1)*
      +             sqrt(velterm)*vk*vk*dist*dist*re)
               fd = 1.0-cctanh((8.0*rd)*(8.0*rd)*(8.0*rd))
+              if (isub .ge. 1 .and. isub .le. 4)
+     +          call deltaDES(isub,idesuse,j,k,i,jdim,kdim,idim,
+     +          x,y,z,sj,sk,si,vol,ux,fd,delta)
+              if (isub .eq. 5)
+     +          call deltaDES_isub5(idesuse,j,k,i,jdim,kdim,idim,
+     +          x,y,z,sj,sk,si,vol,ux,fd,vtm_data,delta)
               term = ccmaxrc(0.0,ell-cdes*delta)
               xlscale(j,k,i) = ell - fd*term
-              if (ides .eq. 3) then
+              if (idesuse .eq. 3) then
                 fdsav(j,k,i)=fd
               end if
             enddo
           enddo
         enddo
       end if
+      if (allocated(vtm_data)) deallocate(vtm_data)
 c  Source terms for k-omega (Wilcox & SST):
       if (ivmx .eq. 6 .or. ivmx .eq. 7) then
         pklimtermset=pklimterm
@@ -2407,7 +2508,7 @@ c
      .             k.ge.klamlo .and. k.lt.klamhi) .or.
      .             real(smin(j,k,i)) .lt. 0.) then
                 cutoff=0.
-              else if( ides .eq. 3 .and.
+              else if( idesuse .eq. 3 .and.
      .         real(fdsav(j,k,i)) .gt. real(cddes) ) then
                 cutoff = (1.d0 - fdsav(j,k,i))/(1.d0-cddes)
               else
@@ -2545,7 +2646,7 @@ c   Get Pk and Dk:
                 pk=vist3d(j,k,i)/(q(j,k,i,1)*re)*vor(j,k,i)**2
               end if
               pk=pk*fr1
-              if (ides .ne. 0) then
+              if (idesuse .ne. 0) then
                 dk=(turre(j,k,i,2)**1.5)/xlscale(j,k,i)
               else
                 dk=re*cmuc*turre(j,k,i,1)*turre(j,k,i,2)

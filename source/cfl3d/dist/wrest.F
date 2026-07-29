@@ -111,7 +111,8 @@ c
       common /twod/ i2d
       common /avgdata/ xnumavg,iteravg,xnumavg2,ipertavg,iclcd,isubit_r
       common /fullns/ ifullns
-      common /des/ cdes,ides,cddes
+      common /des/ cdes,ides,cddes,cdesw,cdese,zface,
+     .             izdes,isub,icdes,iddes
       common /curvat/ isarc2d,sarccr3,ieasmcc2d,isstrc,sstrc_crc,
      .        isar,crot,isarc3d
 c

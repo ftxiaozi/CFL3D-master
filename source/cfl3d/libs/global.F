@@ -151,7 +151,8 @@ c
       common /complx/ xmach_img,alpha_img,beta_img,reue_img,tinf_img,
      .                geom_img,surf_img,xrotrate_img,yrotrate_img,
      .                zrotrate_img
-      common /des/ cdes,ides,cddes
+      common /des/ cdes,ides,cddes,cdesw,cdese,zface,
+     .             izdes,isub,icdes,iddes
       common /elastic/ ndefrm,naesrf
       common /elastic_ss/ idef_ss
       common /params/ lmaxgr,lmaxbl,lmxseg,lmaxcs,lnplts,lmxbli,lmaxxe,
@@ -724,8 +725,10 @@ c   Set wall iwf, wall function parameter:
         iwf(3)=1
         ivisc(3) = abs(ivisc(3))
       end if
-c   DES currently only works with models 5,6,7
-      if (ides .eq. 1 .or. ides .eq. 2 .or. ides .eq. 3) then
+c   Validate turbulence models supported by the selected DES family.
+      idesuse=max(ides,izdes)
+      if (idesuse .eq. 1 .or. idesuse .eq. 2 .or.
+     .    idesuse .eq. 3) then
         if (i2d .ne. 1) then
           if ((ivisc(1).eq.5 .or. ivisc(1).eq.6 .or. ivisc(1).eq.7 .or.
      .         ivisc(1).eq.40) .and.
@@ -752,23 +755,36 @@ c   DES currently only works with models 5,6,7
           end if
         end if
       end if
-      if (ides .gt. 3) then
+      if (idesuse .eq. 4 .or. idesuse .eq. 5) then
         if (i2d .ne. 1) then
-          if ((ivisc(1).lt.5 .or. ivisc(1).gt.5) .and.
-     .        (ivisc(2).lt.5 .or. ivisc(2).gt.5) .and.
-     .        (ivisc(3).lt.5 .or. ivisc(3).gt.5)) then
-            write(iunit11,'('' ides>3 currently works with ivisc'',
-     .       '' 5 only, and must be on in all directions'')')
+          if (.not.((ivisc(1).eq.5 .or. ivisc(1).eq.7) .and.
+     .              (ivisc(2).eq.5 .or. ivisc(2).eq.7) .and.
+     .              (ivisc(3).eq.5 .or. ivisc(3).eq.7))) then
+            write(iunit11,'('' IDDES (ides=4,5) works with ivisc'',
+     .       '' 5 or 7, and must be on in all directions'')')
             call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
           end if
         else
-          if ((ivisc(2).lt.5 .or. ivisc(2).gt.5) .and.
-     .        (ivisc(3).lt.5 .or. ivisc(3).gt.5)) then
-            write(iunit11,'('' ides>3 currently works with ivisc'',
-     .       '' 5 only, and must be on in all directions'')')
+          if (.not.((ivisc(2).eq.5 .or. ivisc(2).eq.7) .and.
+     .              (ivisc(3).eq.5 .or. ivisc(3).eq.7))) then
+            write(iunit11,'('' IDDES (ides=4,5) works with ivisc'',
+     .       '' 5 or 7, and must be on in active directions'')')
             call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
           end if
         end if
+      else if (idesuse .gt. 5) then
+        if (i2d .ne. 1) then
+          if (.not.(ivisc(1).eq.5 .and. ivisc(2).eq.5 .and.
+     .              ivisc(3).eq.5)) then
+            write(iunit11,'('' ides>5 currently works with ivisc'',
+     .       '' 5 only, and must be on in all directions'')')
+            call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
+          endif
+        else if (.not.(ivisc(2).eq.5 .and. ivisc(3).eq.5)) then
+          write(iunit11,'('' ides>5 currently works with ivisc'',
+     .     '' 5 only, and must be on in active directions'')')
+          call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
+        endif
       end if
 c   for Degani schiff, set ideg=1 and reset ivisc=2 within code:
       ideg(1) = 0

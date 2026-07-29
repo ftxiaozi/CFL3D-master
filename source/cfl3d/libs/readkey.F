@@ -47,7 +47,8 @@ c
       dimension nou(nbuf)
 c
       common /unst/ time,cfltau,ntstep,ita,iunst,cfltau0,cfltauMax
-      common /des/ cdes,ides,cddes
+      common /des/ cdes,ides,cddes,cdesw,cdese,zface,
+     .             izdes,isub,icdes,iddes
       common /avgdata/ xnumavg,iteravg,xnumavg2,ipertavg,iclcd,isubit_r
       common /moov/movie,nframes,icall1,lhdr,icoarsemovie,i2dmovie
       common /ginfo2/ lq2avg,iskip_blocks,inc_2d(3),inc_coarse(3)
@@ -438,6 +439,14 @@ c     cdes=0.65 is standard value for SA-DES; SST-DES may need a different value
 c     (AIAA 2001-0879 uses 0.78)
 c
       cdes = 0.65
+      izdes = 0
+      isub = 0
+      icdes = 0
+      cdesw = 0.4
+      cdese = 0.3
+      iddes = 0
+      zface = 0.
+      nkey = nkey + 7
       nkey     = nkey + 1
 c
 c     additional constant associated with Modified DDES (ides .ge. 3)
@@ -1049,6 +1058,17 @@ c
       read(iunit5,1593,end=1900) inpstr
       if (inpstr(1:1).eq.'<') then
          if (iunit11.gt.0) write(iunit11,1102)
+         if (ides.ge.1 .and. izdes.ge.1) then
+           nou(1)=min(nou(1)+1,ibufdim)
+           write(bou(nou(1),1),'(''STOPPING: choose ides or izdes,'',
+     +       '' not both'')')
+           call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
+         endif
+         if (isub.lt.0 .or. isub.gt.5) then
+           nou(1)=min(nou(1)+1,ibufdim)
+           write(bou(nou(1),1),'(''STOPPING: isub must be 0--5'')')
+           call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
+         endif
 
 c        do any order-dependent things here before exiting
 
@@ -1499,10 +1519,38 @@ c
          lc2 = lc2 +1
          read(inpstr(lc2:lcl),*) ides
 c
+      else if (inpstr(lc1:lc2).eq.'izdes') then
+         lc2 = lc2 +1
+         read(inpstr(lc2:lcl),*) izdes
+c
+      else if (inpstr(lc1:lc2).eq.'isub') then
+         lc2 = lc2 +1
+         read(inpstr(lc2:lcl),*) isub
+c
+      else if (inpstr(lc1:lc2).eq.'icdes') then
+         lc2 = lc2 +1
+         read(inpstr(lc2:lcl),*) icdes
+c
+      else if (inpstr(lc1:lc2).eq.'iddes') then
+         lc2 = lc2 +1
+         read(inpstr(lc2:lcl),*) iddes
+c
       else if (inpstr(lc1:lc2).eq.'cdes') then
          lc2 = lc2 +1
          read(inpstr(lc2:lcl),*) realval(1)
          cdes = realval(1)
+      else if (inpstr(lc1:lc2).eq.'cdesw') then
+         lc2 = lc2 +1
+         read(inpstr(lc2:lcl),*) realval(1)
+         cdesw = realval(1)
+      else if (inpstr(lc1:lc2).eq.'cdese') then
+         lc2 = lc2 +1
+         read(inpstr(lc2:lcl),*) realval(1)
+         cdese = realval(1)
+      else if (inpstr(lc1:lc2).eq.'zface') then
+         lc2 = lc2 +1
+         read(inpstr(lc2:lcl),*) realval(1)
+         zface = realval(1)
       else if (inpstr(lc1:lc2).eq.'cddes') then
          lc2 = lc2 +1
          read(inpstr(lc2:lcl),*) realval(1)

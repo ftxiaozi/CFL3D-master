@@ -43,7 +43,8 @@ c
 c
       dimension nou(nbuf)
 c
-      common /des/ cdes,ides,cddes
+      common /des/ cdes,ides,cddes,cdesw,cdese,zface,
+     .             izdes,isub,icdes,iddes
       common /info/ title(20),rkap(3),xmach,alpha,beta,dt,fmax,nit,ntt,
      .        idiag(3),nitfo,iflagts,iflim(3),nres,levelb(5),mgflag,
      .        iconsf,mseq,ncyc1(5),levelt(5),nitfo1(5),ngam,nsm(5),iipv
@@ -94,6 +95,11 @@ c
      +          volk0(jdim,idim-1,4),voli0(jdim,kdim,4)
       dimension bcj(kdim,idim-1,2),bck(jdim,idim-1,2),bci(jdim,kdim,2),
      + ux(jdim-1,kdim-1,idim-1,9),vx(0:jdim,0:kdim,idim-1,isarcnum)
+#ifdef CMPLX
+      complex, allocatable :: vtm_data(:,:,:)
+#else
+      real, allocatable :: vtm_data(:,:,:)
+#endif
 c
       if(isklton .gt. 0) then
         if (i_saneg .eq. 1) then
@@ -1254,7 +1260,19 @@ c    Add source term to RHS
       end if
 c     can use damp1 to temporarily store distance variable (different for DES)
 c     (later, damp1 is used to store LHS implicit contribution)
-        if (ides .eq. 1) then
+        idesuse=max(ides,izdes)
+        if (isub .eq. 5 .and. idesuse .gt. 0) then
+          allocate(vtm_data(jdim-1,kdim-1,idim-1))
+          do i=1,idim-1
+            do k=1,kdim-1
+              do j=1,jdim-1
+                call des_vtm_cell(ux,j,k,i,jdim,kdim,idim,
+     +            vtm_data(j,k,i))
+              enddo
+            enddo
+          enddo
+        endif
+        if (idesuse .eq. 1) then
 c       DES
         do i=1,idim-1
           do j=1,jdim-1
@@ -1270,11 +1288,67 @@ c
                  delta = ccmax(delta,deltai)
               end if
 
+              if (isub .ge. 1 .and. isub .le. 4)
+     +          call deltaDES(isub,idesuse,j,k,i,jdim,kdim,idim,
+     +          x,y,z,sj,sk,si,vol,ux,1.,delta)
+              if (isub .eq. 5)
+     +          call deltaDES_isub5(idesuse,j,k,i,jdim,kdim,idim,
+     +          x,y,z,sj,sk,si,vol,ux,1.,vtm_data,delta)
               damp1(j,k,i) = ccmin(ccabs(smin(j,k,i)),cdes*delta)
             enddo
           enddo
         enddo
-        elseif (ides .ge. 2) then
+        elseif (idesuse .eq. 4) then
+c       Improved delayed DES (Shur et al. shielding/elevating functions)
+        do i=1,idim-1
+          do j=1,jdim-1
+            do k=1,kdim-1
+              deltaj=2.*vol(j,k,i)/(sj(j,k,i,4)+sj(j+1,k,i,4))
+              deltak=2.*vol(j,k,i)/(sk(j,k,i,4)+sk(j,k+1,i,4))
+              deltai=2.*vol(j,k,i)/(si(j,k,i,4)+si(j,k,i+1,4))
+              deltamax=ccmax(deltaj,ccmax(deltak,deltai))
+              deltamin=ccmin(deltaj,ccmin(deltak,deltai))
+              dist=ccabs(smin(j,k,i))
+              velterm=ux(j,k,i,1)**2+ux(j,k,i,2)**2+
+     +          ux(j,k,i,3)**2+ux(j,k,i,4)**2+ux(j,k,i,5)**2+
+     +          ux(j,k,i,6)**2+ux(j,k,i,7)**2+ux(j,k,i,8)**2+
+     +          ux(j,k,i,9)**2+1.e-30
+              chi=turre(j,k,i)/fnu(j,k,i)
+              fv1=chi**3/(chi**3+cv1**3)
+              nut=fv1*turre(j,k,i)
+              rdt=nut/(sqrt(velterm)*akarman**2*dist**2*re+1.e-30)
+              fdt=1.-cctanh((8.*rdt)**3)
+              rdl=fnu(j,k,i)/(sqrt(velterm)*akarman**2*dist**2*re+
+     +            1.e-30)
+              alphan=.25-dist/deltamax
+              ttn=alphan**2
+              if (real(alphan) .ge. 0.) then
+                fe1=2.*exp(-11.09*ttn)
+              else
+                fe1=2.*exp(-9.*ttn)
+              endif
+              ftn=cctanh((1.63**2*rdt)**3)
+              fln=cctanh((3.55**2*rdl)**10)
+              fe2=1.-ccmax(ftn,fln)
+              fe=ccmaxrc(0.,fe1-1.)*fe2
+              fb=ccminrc(2.*exp(-9.*ttn),1.)
+              fdn=ccmax(1.-fdt,fb)
+              delta=deltamax
+              if (isub .ge. 1 .and. isub .le. 4)
+     +          call deltaDES(isub,idesuse,j,k,i,jdim,kdim,idim,
+     +          x,y,z,sj,sk,si,vol,ux,fdn,delta)
+              if (isub .eq. 5)
+     +          call deltaDES_isub5(idesuse,j,k,i,jdim,kdim,idim,
+     +          x,y,z,sj,sk,si,vol,ux,fdn,vtm_data,delta)
+              deltani=.15*ccmax(dist,deltamax)
+              deltani=ccmax(deltani,deltamin)
+              deltani=ccmin(deltani,delta)
+              damp1(j,k,i)=fdn*(1.+fe)*dist+
+     +          (1.-fdn)*cdes*deltani
+            enddo
+          enddo
+        enddo
+        elseif (idesuse .ge. 2) then
 c       DDES (TCFD 20:181-195, 2006)
         do i=1,idim-1
           do j=1,jdim-1
@@ -1297,7 +1371,13 @@ c
               rd = turre(j,k,i)/(sqrt(velterm)*akarman*akarman*
      +             dist*dist*re)
               fd(j,k,i) = 1.0 - cctanh((8.0*rd)*(8.0*rd)*(8.0*rd))
-              if( ides .ne. 7 ) then
+              if (isub .ge. 1 .and. isub .le. 4)
+     +          call deltaDES(isub,idesuse,j,k,i,jdim,kdim,idim,
+     +          x,y,z,sj,sk,si,vol,ux,fd(j,k,i),delta)
+              if (isub .eq. 5)
+     +          call deltaDES_isub5(idesuse,j,k,i,jdim,kdim,idim,
+     +          x,y,z,sj,sk,si,vol,ux,fd(j,k,i),vtm_data,delta)
+              if( idesuse .ne. 7 ) then
                  term = ccmaxrc(0.0,dist-cdes*delta)
                  damp1(j,k,i) = dist - fd(j,k,i)*term
               else
@@ -1315,6 +1395,7 @@ c
           enddo
         enddo
         end if
+        if (allocated(vtm_data)) deallocate(vtm_data)
 c
 c   For SARC model, eventually need to compute rtilde as fn of Dalpha/Dt
         if (isarc2d .eq. 1) then
@@ -1352,15 +1433,9 @@ c
      .              k.ge.klamlo .and. k.lt.klamhi) .or.
      .              real(smin(j,k,i)) .lt. 0.) then
                   cutoff=0.
-               else if( ides .eq. 3 .and.
+               else if( idesuse .eq. 3 .and.
      .          real(fd(j,k,i)) .gt. real(cddes) ) then
                   cutoff = (1.d0 - fd(j,k,i))/(1.d0-cddes)
-               else if( ides .eq. 4 .and.
-     .          real(fd(j,k,i)) .gt. real(cddes) ) then
-                  cutoff = (1.d0 - fd(j,k,i))/(1.d0-cddes)
-               else if( ides .eq. 5 .and.
-     .          real(fd(j,k,i)) .gt. 0.999d0 ) then
-                  cutoff = (1.d0 - fd(j,k,i))/(1.d0-0.999d0)
                else
                   cutoff=1.
                end if
@@ -2512,7 +2587,8 @@ c Update VIST3D and save TURRE in TURSAV
               fv1=chi**3/(chi**3+cv1**3)
               vist3d(j,k,i)=fv1*turre(j,k,i)*q(j,k,i,1)
             end if
-            if( ides .ge. 4 .and. real(fd(j,k,i)) .gt. real(cddes)) then
+            if( idesuse .ge. 6 .and.
+     +          real(fd(j,k,i)) .gt. real(cddes)) then
                vist3d(j,k,i) = vist3d(j,k,i)
      $              * (1.d0 - fd(j,k,i))/(1.d0-cddes)
             end if
