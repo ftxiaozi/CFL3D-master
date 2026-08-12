@@ -293,6 +293,8 @@ c
       common /precond/ cprec,uref,avn
       common /mydist2/ nnodes,myhost,myid,mycomm
       common /maxiv/ ivmx
+      common /hybrid/ hyb_cv,ihyb_vreman,ihyb_shield,
+     .                ihyb_resolution,ihyb_diagnostics,ihyb_test
       common /motionmc/ xmc0,ymc0,zmc0,utransmc,vtransmc,wtransmc,
      .                  omegaxmc,omegaymc,omegazmc,xorigmc,yorigmc,
      .                  zorigmc,xorig0mc,yorig0mc,zorig0mc,thetaxmc,
@@ -1516,13 +1518,15 @@ c        flux contributions
 c
          isf = 0
          if (level.gt.lglobal .and. ntime.eq.nit1) isf = min(1,iconsf)
+         lvisflow=lvis
+         if (ihyb_vreman .eq. 1 .and. ivmx .eq. 7) lvisflow=lsig
          call resid(nbl,ntime,jdim,kdim,idim,w(lq),w(lqj0),w(lqk0),
      .              w(lqi0),w(lsj),w(lsk),w(lsi),w(lvol),w(ldtj),w(lx),
      .              w(ly),w(lz),w(lvis),w(lsni0),w(lsnk0),w(lsni0),
      .              wk(lres),wk(lwj0),wk(lwk0),wk(lwi0),wk(lvmuk),
      .              wk(lvmuj),wk(lvmui),wk(ltot),lsafe,
      .              isf,iw,wk,deltat(level),w(lblk),iovrlp(nbl),
-     .              nblendg,nblstat,nblstag,w(lxib),w(lsig),
+     .              nblendg,nblstat,nblstag,w(lxib),w(lvisflow),
      .              w(lsqtq),w(lg),w(ltj0),w(ltk0),w(lti0),
      .              w(lxkb),w(lnbl),w(lvj0),w(lvk0),w(lvi0),w(lbcj),
      .              w(lbck),w(lbci),nt,sumn,negn,w(lux),
@@ -1701,7 +1705,8 @@ c
 c
          if (mblk2nd(nbl) .eq. myid) then
             call update(jdim,kdim,idim,w(lq),w(lqj0),w(lqk0),w(lqi0),
-     .                  w(lsj),w(lsk),w(lsi),w(lvol),w(ldtj),w(lvis),
+     .                  w(lsj),w(lsk),w(lsi),w(lvol),w(ldtj),
+     .                  w(lvisflow),
      .                  w(lblk),w(lx),w(ly),w(lz), wk(lres),wk(lwk0),
      .                  wk(lvmuk),wk(lvmuj),wk(lvmui),wk(ltot),lsafe,
      .                  nbl,iovrlp(nbl),w(lvk0),w(lbcj),w(lbck),w(lbci),
@@ -1868,6 +1873,11 @@ c
      .                    jj2,kk2,ii2,wk(lres),w(lqrc),wk(lwj0),
      .                    w(lvis),w(lvtc),w(lxib),w(lxibc),
      .                    nbl,nou,bou,nbuf,ibufdim,nummem)
+               if (ihyb_vreman .eq. 1 .and. ivmx .eq. 7) then
+                  lsigc=lw(20,nbl+1)
+                  call sstvreman_coll(w(lsig),w(lsigc),jdim,kdim,idim,
+     .                                jj2,kk2,ii2)
+               end if
 c
 c              restrict qc0 and dqc0 for time-accurate multigrid
 c

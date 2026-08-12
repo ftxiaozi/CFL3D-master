@@ -49,6 +49,8 @@ c
       common /unst/ time,cfltau,ntstep,ita,iunst,cfltau0,cfltauMax
       common /des/ cdes,ides,cddes,cdesw,cdese,zface,
      .             izdes,isub,icdes,iddes
+      common /hybrid/ hyb_cv,ihyb_vreman,ihyb_shield,
+     .                ihyb_resolution,ihyb_diagnostics,ihyb_test
       common /avgdata/ xnumavg,iteravg,xnumavg2,ipertavg,iclcd,isubit_r
       common /moov/movie,nframes,icall1,lhdr,icoarsemovie,i2dmovie
       common /ginfo2/ lq2avg,iskip_blocks,inc_2d(3),inc_coarse(3)
@@ -453,6 +455,19 @@ c     additional constant associated with Modified DDES (ides .ge. 3)
 c
       cddes = 0.975
       nkey     = nkey + 1
+c
+c     SST-Vreman hybrid model controls.  The model retains standard SST
+c     for the k-omega equations and uses the blended viscosity only in
+c     the mean-flow equations.  ihyb_test=1 forces gamma=0, =2 forces
+c     gamma=1, and =3 forces the Vreman viscosity to the SST viscosity.
+c
+      hyb_cv            = 0.07
+      ihyb_vreman       = 0
+      ihyb_shield       = 1
+      ihyb_resolution   = 1
+      ihyb_diagnostics  = 1
+      ihyb_test         = 0
+      nkey              = nkey + 6
 
 c
 c     flag to store iteration-averaged q values in a PLOT3D file:
@@ -1069,6 +1084,25 @@ c
            write(bou(nou(1),1),'(''STOPPING: isub must be 0--5'')')
            call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
          endif
+         if (ihyb_vreman.lt.0 .or. ihyb_vreman.gt.1) then
+           nou(1)=min(nou(1)+1,ibufdim)
+           write(bou(nou(1),1),'(''STOPPING: ihyb_vreman must be'',
+     .       '' 0 or 1'')')
+           call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
+         endif
+         if (ihyb_shield.lt.0 .or. ihyb_shield.gt.1 .or.
+     +       ihyb_resolution.lt.0 .or. ihyb_resolution.gt.1 .or.
+     +       ihyb_diagnostics.lt.0 .or. ihyb_diagnostics.gt.1) then
+           nou(1)=min(nou(1)+1,ibufdim)
+           write(bou(nou(1),1),'(''STOPPING: hybrid switches must'',
+     .       '' be 0 or 1'')')
+           call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
+         endif
+         if (ihyb_test.lt.0 .or. ihyb_test.gt.3) then
+           nou(1)=min(nou(1)+1,ibufdim)
+           write(bou(nou(1),1),'(''STOPPING: ihyb_test must be 0--3'')')
+           call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
+         endif
 
 c        do any order-dependent things here before exiting
 
@@ -1518,6 +1552,31 @@ c
       else if (inpstr(lc1:lc2).eq.'ides') then
          lc2 = lc2 +1
          read(inpstr(lc2:lcl),*) ides
+c
+      else if (inpstr(lc1:lc2).eq.'ihyb_vreman') then
+         lc2 = lc2 +1
+         read(inpstr(lc2:lcl),*) ihyb_vreman
+c
+      else if (inpstr(lc1:lc2).eq.'hyb_cv') then
+         lc2 = lc2 +1
+         read(inpstr(lc2:lcl),*) realval(1)
+         hyb_cv = abs(realval(1))
+c
+      else if (inpstr(lc1:lc2).eq.'ihyb_shield') then
+         lc2 = lc2 +1
+         read(inpstr(lc2:lcl),*) ihyb_shield
+c
+      else if (inpstr(lc1:lc2).eq.'ihyb_resolution') then
+         lc2 = lc2 +1
+         read(inpstr(lc2:lcl),*) ihyb_resolution
+c
+      else if (inpstr(lc1:lc2).eq.'ihyb_diagnostics') then
+         lc2 = lc2 +1
+         read(inpstr(lc2:lcl),*) ihyb_diagnostics
+c
+      else if (inpstr(lc1:lc2).eq.'ihyb_test') then
+         lc2 = lc2 +1
+         read(inpstr(lc2:lcl),*) ihyb_test
 c
       else if (inpstr(lc1:lc2).eq.'izdes') then
          lc2 = lc2 +1

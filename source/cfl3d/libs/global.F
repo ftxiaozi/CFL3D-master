@@ -153,6 +153,8 @@ c
      .                zrotrate_img
       common /des/ cdes,ides,cddes,cdesw,cdese,zface,
      .             izdes,isub,icdes,iddes
+      common /hybrid/ hyb_cv,ihyb_vreman,ihyb_shield,
+     .                ihyb_resolution,ihyb_diagnostics,ihyb_test
       common /elastic/ ndefrm,naesrf
       common /elastic_ss/ idef_ss
       common /params/ lmaxgr,lmaxbl,lmxseg,lmaxcs,lnplts,lmxbli,lmaxxe,
@@ -723,7 +725,47 @@ c   Set wall iwf, wall function parameter:
       end if
       if (ivisc(3) .lt. 0) then
         iwf(3)=1
-        ivisc(3) = abs(ivisc(3))
+         ivisc(3) = abs(ivisc(3))
+      end if
+c
+c   The first SST-Vreman implementation deliberately uses the unmodified
+c   standard SST transport equations.  Reject combinations that would
+c   change those equations or the constitutive relation being tested.
+c
+      if (ihyb_vreman .eq. 1) then
+        if (i2d .eq. 1) then
+          write(iunit11,'('' SST-Vreman hybrid currently requires a'',
+     .      '' three-dimensional grid'')')
+          call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
+        end if
+        if (ivisc(1).ne.7 .or. ivisc(2).ne.7 .or. ivisc(3).ne.7) then
+          write(iunit11,'('' SST-Vreman hybrid requires ivisc=7 in'',
+     .      '' all three directions'')')
+          call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
+        end if
+        if (ides.ne.0 .or. izdes.ne.0) then
+          write(iunit11,'('' SST-Vreman hybrid version 1 cannot be'',
+     .      '' combined with ides or izdes'')')
+          call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
+        end if
+        if (iwf(1).ne.0 .or. iwf(2).ne.0 .or. iwf(3).ne.0) then
+          write(iunit11,'('' SST-Vreman hybrid version 1 does not'',
+     .      '' support wall functions'')')
+          call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
+        end if
+        if (i_nonlin.ne.0 .or. i_tauijs.ne.0 .or. i_qcr2000.ne.0 .or.
+     .      i_qcr2013.ne.0 .or. i_qcr2013v.ne.0) then
+          write(iunit11,'('' SST-Vreman hybrid version 1 requires'',
+     .      '' the linear eddy-viscosity constitutive relation'')')
+          call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
+        end if
+        if (real(hyb_cv) .le. 0.) then
+          write(iunit11,'('' SST-Vreman hybrid requires hyb_cv > 0'')')
+          call termn8(myid,ierrflg,ibufdim,nbuf,bou,nou)
+        end if
+        write(iunit11,'('' SST-Vreman hybrid enabled: Cv='',f9.5,
+     .    '', shielding='',i2,'', resolution sensor='',i2)')
+     .    real(hyb_cv),ihyb_shield,ihyb_resolution
       end if
 c   Validate turbulence models supported by the selected DES family.
       idesuse=max(ides,izdes)

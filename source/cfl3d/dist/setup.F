@@ -187,6 +187,8 @@ c
      .        idiag(3),nitfo,iflagts,iflim(3),nres,levelb(5),mgflag,
      .        iconsf,mseq,ncyc1(5),levelt(5),nitfo1(5),ngam,nsm(5),iipv
       common /maxiv/ ivmx
+      common /hybrid/ hyb_cv,ihyb_vreman,ihyb_shield,
+     .                ihyb_resolution,ihyb_diagnostics,ihyb_test
       common /ncyct/ ncyctot
       common /reyue/ reue,tinf,ivisc(3)
       common /sklton/ isklton
@@ -2906,6 +2908,20 @@ c     I-dir:
           endif
         enddo
       enddo
+      end if
+c
+c     The first CFL evaluation precedes the first turbulence update.  Seed
+c     the independent hybrid viscosity with SST so that startup and restart
+c     use a defined, conservative value.
+      if (ihyb_vreman .eq. 1 .and. ivmx .eq. 7) then
+         do nbl=1,nblock
+            if (mblk2nd(nbl).eq.myid) then
+               call lead(nbl,lw,lw2,maxbl)
+               do l=1,jdim*kdim*idim
+                  w(lsig+l-1)=w(lvis+l-1)
+               enddo
+            end if
+         enddo
       end if
 c
 c********************************************************

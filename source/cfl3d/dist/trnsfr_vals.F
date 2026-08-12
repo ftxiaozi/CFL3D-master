@@ -148,6 +148,8 @@ c
       common /cgns/ icgns,iccg,ibase,nzones,nsoluse,irind,jrind,krind
       common /des/ cdes,ides,cddes,cdesw,cdese,zface,
      .             izdes,isub,icdes,iddes
+      common /hybrid/ hyb_cv,ihyb_vreman,ihyb_shield,
+     .                ihyb_resolution,ihyb_diagnostics,ihyb_test
       common /cfl/ dt0,dtold
       common /avgdata/ xnumavg,iteravg,xnumavg2,ipertavg,iclcd,isubit_r
       common /precond/ cprec,uref,avn
@@ -552,6 +554,12 @@ c
          work(nlast+187)= cdesw
          work(nlast+188)= cdese
          work(nlast+189)= zface
+         work(nlast+190)= hyb_cv
+         work(nlast+191)= ihyb_vreman
+         work(nlast+192)= ihyb_shield
+         work(nlast+193)= ihyb_resolution
+         work(nlast+194)= ihyb_diagnostics
+         work(nlast+195)= ihyb_test
          work(nlast+127)= scal_ic
          work(nlast+128)= ifunct
          work(nlast+129)= lowmem_ux
@@ -921,6 +929,12 @@ c
          cdesw = work(nlast+187)
          cdese = work(nlast+188)
          zface = work(nlast+189)
+         hyb_cv = work(nlast+190)
+         ihyb_vreman = int(work(nlast+191))
+         ihyb_shield = int(work(nlast+192))
+         ihyb_resolution = int(work(nlast+193))
+         ihyb_diagnostics = int(work(nlast+194))
+         ihyb_test = int(work(nlast+195))
          scal_ic = work(nlast+127)
          ifunct = int(work(nlast+128))
          lowmem_ux = int(work(nlast+129))

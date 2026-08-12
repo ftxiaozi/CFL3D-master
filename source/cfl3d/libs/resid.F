@@ -23,7 +23,7 @@ c
       subroutine resid(nbl,ntime,jdim,kdim,idim,q,qj0,qk0,qi0,sj,sk,si,
      .           vol,dtj,x,y,z,vist3d,snj0,snk0,sni0,res,wj0,wk0,wi0,
      .           vmuk,vmuj,vmui,wk,nwork,isf,iwfa,wfa,delt,blank,iover,
-     .           nblendg,nblstat,nblstag,xib,sig,sqtq,g,
+     .           nblendg,nblstat,nblstag,xib,vishyb,sqtq,g,
      .           tj0,tk0,ti0,xkb,blnum,vj0,vk0,vi0,bcj,bck,bci,
      .           nt,sumn,negn,ux,xib2,cmuv,volj0,
      .           volk0,voli0,nou,bou,nbuf,ibufdim,myid,mblk2nd,maxbl,
@@ -65,7 +65,7 @@ c     dimension vmu(jdim-1,idim-1),vmuj1(kdim-1,idim-1)
      .          sk(jdim*kdim*(idim-1),5)
       dimension res(jdim*kdim*(idim-1),5),vol(jdim*kdim*(idim-1)),
      .          dtj(jdim*kdim*(idim-1)),vist3d(jdim,kdim,idim)
-      dimension xib(jdim,kdim,idim,nummem),sig(jdim-1,idim-1),
+      dimension xib(jdim,kdim,idim,nummem),vishyb(jdim,kdim,idim),
      .          sqtq(jdim-1,idim-1),g(-1:jdim+1,-1:idim+1),
      .          tj0(kdim,idim-1,nummem,4),tk0(jdim,idim-1,nummem,4),
      .          ti0(jdim,kdim,nummem,4),xkb(jdim-1,kdim-1,idim-1),
@@ -119,6 +119,8 @@ c
       common /mms/ iexact_trunc,iexact_disc,iexact_ring
       common /des/ cdes,ides,cddes,cdesw,cdese,zface,
      .             izdes,isub,icdes,iddes
+      common /hybrid/ hyb_cv,ihyb_vreman,ihyb_shield,
+     .                ihyb_resolution,ihyb_diagnostics,ihyb_test
       common /memry/ lowmem_ux
       common /constit/ i_nonlin,c_nonlin,snonlin_lim,i_tauijs,i_qcr2000,
      .                 i_qcr2013,i_qcr2013v
@@ -227,7 +229,7 @@ c
       if (real(dt).gt.0 .and. ita.gt.0 .and. icyc.gt.1) go to 130
 c
       call ctime1(nbl,jdim,kdim,idim,q,vol,sj,sk,si,dtj,wk,delt,
-     .           vist3d,iterm,dtmin,iout,ntime,nou,bou,nbuf,ibufdim,
+     .           vishyb,iterm,dtmin,iout,ntime,nou,bou,nbuf,ibufdim,
      .           idefrm(nbl))
 c
 c     zero out time step at hole points for chimera scheme
@@ -293,7 +295,8 @@ c
      .    ((ivmx.eq.5) .and. isar.eq.1) .or.
      .    (ivmx.eq.6 .and. i_wilcox06.eq.1) .or.
      .    (ivmx.eq.6 .and. i_wilcox98.eq.1) .or.
-     .    ides.ge.2 .or. i_nonlin.ne.0 .or. i_tauijs.ne.0) then
+     .    ides.ge.2 .or. ihyb_vreman.eq.1 .or. i_nonlin.ne.0 .or.
+     .    i_tauijs.ne.0) then
           call delv(jdim,kdim,idim,q,sj,sk,si,vol,ux,wk,blank,iover,
      .          qj0,qk0,qi0,bcj,bck,bci,nbl,volj0,volk0,voli0,
      .          maxbl,vormax,ivmax,jvmax,kvmax)
@@ -655,6 +658,11 @@ c allocate for DES and DDES
      + wk(iwk73),wk(iwk74),wk(iwk75),
      + wk(iwk76),wk(iwk77),wk(iwk78),wk(iwk79),wk(iwk80),wk(iwk81),
      + wk(iwk82),nummem,iccnum)
+      if (ihyb_vreman .eq. 1 .and. ivmx .eq. 7) then
+        call sstvreman_field(jdim,kdim,idim,q,x,y,z,sj,sk,si,vol,ux,
+     +    snk0,xib,wk(iwk4),vist3d,vishyb,blank)
+        call sstvreman_bvis(jdim,kdim,idim,vist3d,vishyb,vj0,vk0,vi0)
+      end if
       else if (ivmx .eq. 30) then
 c   three-equation turb model
       iwk1=1
@@ -1022,14 +1030,14 @@ c
          if (i+npl-1.gt.idim1) npl = idim1-i+1
          nvtq = npl*jdim*kdim
          call gfluxv(i,npl,jdim,kdim,idim,res,q,qj0,sj,vol,wk,
-     .               nvtq,wj0,vist3d,vmuj,vj0,bcj,xib,tj0,cmuv,
+     .               nvtq,wj0,vishyb,vmuj,vj0,bcj,xib,tj0,cmuv,
      .               volj0,nou,bou,nbuf,ibufdim,iadvance(nbl),nummem,ux)
 c
 c-- full viscous terms
 c
          if (ifullns .ne. 0) then
          call gfluxv1(i,npl,jdim,kdim,idim,res,q,qj0,qk0,qi0,
-     .                sj,sk,si,vol,wk,nvtq,wj0,vist3d,vj0,
+     .                sj,sk,si,vol,wk,nvtq,wj0,vishyb,vj0,
      .                bcj,bck,bci,volj0,
      .                nou,bou,nbuf,ibufdim,iadvance(nbl))
          end if
@@ -1075,7 +1083,7 @@ c
          if (i+npl-1.gt.idim1) npl = idim1-i+1
          nvtq = npl*jdim*kdim
          call hfluxv(i,npl,jdim,kdim,idim,0,wk(iwk4),wk(iwk5),wk(iwk6),
-     .               res,q,qk0,sk,vol,wk,nvtq,wk0,vist3d,vmuk,vk0,bck,
+     .               res,q,qk0,sk,vol,wk,nvtq,wk0,vishyb,vmuk,vk0,bck,
      .               xib,tk0,cmuv,volk0,nou,bou,nbuf,ibufdim,
      .               iadvance(nbl),nummem,ux)
 c
@@ -1083,7 +1091,7 @@ c-- full viscous terms
 c
          if (ifullns .ne. 0) then
          call hfluxv1(i,npl,jdim,kdim,idim,res,q,qj0,qk0,qi0,
-     .                sj,sk,si,vol,wk,nvtq,wk0,vist3d,vk0,
+     .                sj,sk,si,vol,wk,nvtq,wk0,vishyb,vk0,
      .                bcj,bck,bci,volk0,
      .                nou,bou,nbuf,ibufdim,iadvance(nbl))
          end if
@@ -1133,7 +1141,7 @@ c
             if (k+npl-1.gt.kdim1) npl = kdim1-k+1
             nvtq = npl*jdim*idim
             call ffluxv(k,npl,jdim,kdim,idim,res,q,qi0,si,vol,wk,
-     .                  nvtq,wi0,vist3d,vmui,vi0,bci,xib,ti0,cmuv,
+     .                  nvtq,wi0,vishyb,vmui,vi0,bci,xib,ti0,cmuv,
      .                  voli0,nou,bou,nbuf,ibufdim,iadvance(nbl),nummem
      .                  ,ux)
 c
@@ -1141,7 +1149,7 @@ c-- full viscous terms
 c
             if (ifullns .ne. 0) then
             call ffluxv1(k,npl,jdim,kdim,idim,res,q,qj0,qk0,qi0,
-     .                   sj,sk,si,vol,wk,nvtq,wi0,vist3d,vi0,
+     .                   sj,sk,si,vol,wk,nvtq,wi0,vishyb,vi0,
      .                   bcj,bck,bci,voli0,
      .                   nou,bou,nbuf,ibufdim,iadvance(nbl))
             end if

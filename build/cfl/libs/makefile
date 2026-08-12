@@ -48,7 +48,7 @@ FSRC_LIBS = \
 	blockk.F       dfhat.F        grdmove.F      q8sdot.F \
 	bsub.F         dfluxpm.F      hfluxl.F       q8smax.F \
 	bsubp.F        diagi.F        q8smin.F       spalart.F \
-	deltaDES.F     deltaDES_isub5.F \
+	deltaDES.F     deltaDES_isub5.F sstvreman.F \
 	ccf.F          diagj.F        hole.F         global0.F \
 	tau2x.F        tdq.F          tinvr.F        tmetric.F \
 	trace.F        trans.F        transmc.F      transp.F \

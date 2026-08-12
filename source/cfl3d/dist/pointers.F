@@ -89,6 +89,8 @@ c
      .        isar,crot,isarc3d
       common /des/ cdes,ides,cddes,cdesw,cdese,zface,
      .             izdes,isub,icdes,iddes
+      common /hybrid/ hyb_cv,ihyb_vreman,ihyb_shield,
+     .                ihyb_resolution,ihyb_diagnostics,ihyb_test
       common /plot3dtyp/ ifunct
       common /memry/ lowmem_ux
       common /constit/ i_nonlin,c_nonlin,snonlin_lim,i_tauijs,i_qcr2000,
@@ -512,10 +514,13 @@ c        RSM not working in complex mode
      .      ns = jmkmim*kws_get_nummem()
 #   endif
 c
-c........Johnson-King data no longer stored
+c........vishyb3d(jdim,kdim,idim)
+c        mean-flow eddy viscosity for the SST-Vreman hybrid model.
+c        This reuses the first retired Johnson-King storage slot.
 c
          lw(20,nbl) = lw(19,nbl) + ns
          ns = 0
+         if (ihyb_vreman .eq. 1 .and. ivmx .eq. 7) ns = jmkmim
          lw(21,nbl) = lw(20,nbl) + ns
          ns = 0
          lw(22,nbl) = lw(21,nbl) + ns
@@ -830,7 +835,8 @@ c
      .        ((ivmx.eq.5) .and. isar.eq.1) .or.
      .        (ivmx.eq.6 .and. i_wilcox06.eq.1) .or.
      .        (ivmx.eq.6 .and. i_wilcox98.eq.1) .or. ivmax==72 .or.
-     .        ides.ge.2 .or. i_nonlin.ne.0 .or. i_tauijs.ne.0)
+     .        ides.ge.2 .or. ihyb_vreman.eq.1 .or. i_nonlin.ne.0 .or.
+     .        i_tauijs.ne.0)
      .        ns = jm1km1im1*9
          else
            ns = jm1km1im1*9

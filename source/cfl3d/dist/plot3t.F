@@ -108,6 +108,8 @@ c
      .        idiag(3),nitfo,iflagts,iflim(3),nres,levelb(5),mgflag,
      .        iconsf,mseq,ncyc1(5),levelt(5),nitfo1(5),ngam,nsm(5),iipv
       common /maxiv/ ivmx
+      common /hybrid/ hyb_cv,ihyb_vreman,ihyb_shield,
+     .                ihyb_resolution,ihyb_diagnostics,ihyb_test
       common /reyue/ reue,tinf,ivisc(3)
       common /unst/ time,cfltau,ntstep,ita,iunst,cfltau0,cfltauMax
       common /igrdtyp/ ip3dgrd,ialph
@@ -1383,6 +1385,20 @@ c      unit 1 of grid)
       r23=r23slow+r23rapid
       end if
 c
+c     SST-Vreman diagnostics use the same cell routine as the residual path.
+c     Function slots 32--42 are, respectively: SST viscosity, Vreman
+c     viscosity, hybrid viscosity, gamma, fd, fres, l_R, l_G, A_alpha,
+c     B_beta, and the Vreman/SST viscosity ratio.  Viscosities retain CFL3D's
+c     nondimensional dynamic-viscosity convention.
+      if (ihyb_vreman .eq. 1 .and. ihyb_diagnostics .eq. 1 .and.
+     +    ivmx .eq. 7 .and. ifunct .ge. 32) then
+        call sstvreman_cell(j,k,i,jdim,kdim,idim,q,x,y,z,sj,sk,si,
+     +    vol,ux,smin,turre,fnu,vist3d,re,xmutvhyb,fdhyb,freshyb,
+     +    gammahyb,xlranshyb,xlgridhyb,aalphahyb,bbetahyb,di,dj,dk)
+        xmuthyb=(1.-gammahyb)*vist3d(j,k,i)+gammahyb*xmutvhyb
+        ratiohyb=xmutvhyb/(vist3d(j,k,i)+1.e-30)
+      end if
+c
 c     load appropriate data into single precision array
 c
 #     ifdef CMPLX
@@ -1437,6 +1453,19 @@ c        can add more here, but only if ifunct keyword is big enough!
          if (ifunct .ge.29) xw(jw,kw,iw,29) = real(ux(j,k,i,7))
          if (ifunct .ge.30) xw(jw,kw,iw,30) = real(ux(j,k,i,9))
          if (ifunct .ge.31) xw(jw,kw,iw,31) = real(smin(j,k,i))
+         if (ihyb_vreman.eq.1 .and. ihyb_diagnostics.eq.1) then
+           if (ifunct.ge.32) xw(jw,kw,iw,32)=real(vist3d(j,k,i))
+           if (ifunct.ge.33) xw(jw,kw,iw,33)=real(xmutvhyb)
+           if (ifunct.ge.34) xw(jw,kw,iw,34)=real(xmuthyb)
+           if (ifunct.ge.35) xw(jw,kw,iw,35)=real(gammahyb)
+           if (ifunct.ge.36) xw(jw,kw,iw,36)=real(fdhyb)
+           if (ifunct.ge.37) xw(jw,kw,iw,37)=real(freshyb)
+           if (ifunct.ge.38) xw(jw,kw,iw,38)=real(xlranshyb)
+           if (ifunct.ge.39) xw(jw,kw,iw,39)=real(xlgridhyb)
+           if (ifunct.ge.40) xw(jw,kw,iw,40)=real(aalphahyb)
+           if (ifunct.ge.41) xw(jw,kw,iw,41)=real(bbetahyb)
+           if (ifunct.ge.42) xw(jw,kw,iw,42)=real(ratiohyb)
+         end if
       else
          xw(jw,kw,iw,1) = imag(prod)/real(delh)
          xw(jw,kw,iw,2) = imag(uwprime)/real(delh)
@@ -1481,6 +1510,20 @@ c        can add more here, but only if ifunct keyword is big enough!
      +     real(delh)
          if (ifunct .ge.31) xw(jw,kw,iw,31) = imag(smin(j,k,i))/
      +     real(delh)
+         if (ihyb_vreman.eq.1 .and. ihyb_diagnostics.eq.1) then
+           if (ifunct.ge.32) xw(jw,kw,iw,32)=imag(vist3d(j,k,i))/
+     +       real(delh)
+           if (ifunct.ge.33) xw(jw,kw,iw,33)=imag(xmutvhyb)/real(delh)
+           if (ifunct.ge.34) xw(jw,kw,iw,34)=imag(xmuthyb)/real(delh)
+           if (ifunct.ge.35) xw(jw,kw,iw,35)=imag(gammahyb)/real(delh)
+           if (ifunct.ge.36) xw(jw,kw,iw,36)=imag(fdhyb)/real(delh)
+           if (ifunct.ge.37) xw(jw,kw,iw,37)=imag(freshyb)/real(delh)
+           if (ifunct.ge.38) xw(jw,kw,iw,38)=imag(xlranshyb)/real(delh)
+           if (ifunct.ge.39) xw(jw,kw,iw,39)=imag(xlgridhyb)/real(delh)
+           if (ifunct.ge.40) xw(jw,kw,iw,40)=imag(aalphahyb)/real(delh)
+           if (ifunct.ge.41) xw(jw,kw,iw,41)=imag(bbetahyb)/real(delh)
+           if (ifunct.ge.42) xw(jw,kw,iw,42)=imag(ratiohyb)/real(delh)
+         end if
       end if
 #     else
       xw(jw,kw,iw,1) = real(prod)
@@ -1515,6 +1558,19 @@ c     can add more here, but only if ifunct keyword is big enough!
       if (ifunct .ge.29) xw(jw,kw,iw,29) = real(ux(j,k,i,7))
       if (ifunct .ge.30) xw(jw,kw,iw,30) = real(ux(j,k,i,9))
       if (ifunct .ge.31) xw(jw,kw,iw,31) = real(smin(j,k,i))
+      if (ihyb_vreman.eq.1 .and. ihyb_diagnostics.eq.1) then
+        if (ifunct.ge.32) xw(jw,kw,iw,32)=real(vist3d(j,k,i))
+        if (ifunct.ge.33) xw(jw,kw,iw,33)=real(xmutvhyb)
+        if (ifunct.ge.34) xw(jw,kw,iw,34)=real(xmuthyb)
+        if (ifunct.ge.35) xw(jw,kw,iw,35)=real(gammahyb)
+        if (ifunct.ge.36) xw(jw,kw,iw,36)=real(fdhyb)
+        if (ifunct.ge.37) xw(jw,kw,iw,37)=real(freshyb)
+        if (ifunct.ge.38) xw(jw,kw,iw,38)=real(xlranshyb)
+        if (ifunct.ge.39) xw(jw,kw,iw,39)=real(xlgridhyb)
+        if (ifunct.ge.40) xw(jw,kw,iw,40)=real(aalphahyb)
+        if (ifunct.ge.41) xw(jw,kw,iw,41)=real(bbetahyb)
+        if (ifunct.ge.42) xw(jw,kw,iw,42)=real(ratiohyb)
+      end if
 #     endif
  4000 continue
 c
